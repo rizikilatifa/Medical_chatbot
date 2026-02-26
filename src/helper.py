@@ -1,15 +1,16 @@
-from langchain.document_loaders import PyPDFLoader,DirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
+from src.embeddings import FastOpenAIEmbeddings
 from typing import List
-from langchain.schema import Document
+from langchain_core.documents import Document
+import os
 
 # Extract Data from the PDF File
 def load_pdf_file(data):
    loader = DirectoryLoader(data,
                             glob="*.pdf",
                             loader_cls=PyPDFLoader)
-   
+
 
    documents = loader.load()
 
@@ -44,12 +45,10 @@ def text_split(minimal_docs):
 
 def download_embeddings():
    """
-   Download and return the HuggingFace enbedding model.
-
+   Return fast OpenAI embeddings (no torch dependency).
    """
-   model_name = "sentence-transformers/all-MiniLM-L6-v2"
-   embeddings = HuggingFaceEmbeddings(
-      model_name = model_name,
+   embeddings = FastOpenAIEmbeddings(
+      api_key=os.getenv("OPENAI_API_KEY"),
+      model="text-embedding-3-small"
    )
-
    return embeddings
