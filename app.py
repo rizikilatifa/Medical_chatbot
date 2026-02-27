@@ -1,56 +1,55 @@
 from flask import Flask, render_template, request
-from src.helper import download_embeddings
-from src.llm import FastGroqLLM
-from langchain_pinecone import PineconeVectorStore
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from dotenv import load_dotenv
-from src.prompt import prompt
 import os
-
+import requests
 
 app = Flask(__name__)
 
-load_dotenv()
-
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 
-embeddings = download_embeddings()
+def call_groq(prompt: str) -> str:
+    """Call Groq API directly."""
+    system_prompt = """You are a helpful medical assistant. Answer the user's questions about health and medicine.
+Always remind users that you are an AI and they should consult a real doctor for medical advice."""
 
-index_name = "medical-chatbot"
-# embed each chunk and upsert the embeddings into your pinecone index.
-docsearch = PineconeVectorStore.from_existing_index(
-   index_name=index_name,
-   embedding=embeddings
-)
-
-
-
-retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-
-llm = FastGroqLLM(
-   model="llama-3.3-70b-versatile",
-   temperature=0,
-   api_key=GROQ_API_KEY
-)
-
-doc_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, doc_chain)
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
 
 @app.route("/")
 def index():
-   return render_template('chat.html')
+    return render_template('chat.html')
 
-@app.route("/get", methods = ["GET", "POST"])
-def cha():
-   msg = request.form['msg']
-   print(msg)
-   response = rag_chain.invoke({"input": msg})
-   print("Response : ", response["answer"])
-   return str(response['answer'])
+@app.route("/get", methods=["GET", "POST"])
+def chat():
+    try:
+        msg = request.form['msg']
+        print(f"User: {msg}", flush=True)
 
+        # Call Groq directly
+        answer = call_groq(msg)
+        print(f"Bot: {answer}", flush=True)
+
+        return answer
+    except Exception as e:
+        print(f"Error: {e}", flush=True)
+        return f"Sorry, an error occurred: {str(e)}"
 
 if __name__ == '__main__':
-   app.run(host="0.0.0.0", port = 5000, debug= True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Medical Chatbot on port {port}", flush=True)
+    app.run(host="0.0.0.0", port=port, debug=False)
