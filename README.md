@@ -1,17 +1,19 @@
 # Medical Chatbot
 
-A conversational AI assistant for medical and health-related questions, powered by Groq's Llama 3.3 70B model.
+A conversational AI assistant for medical and health-related questions, powered by Groq's Llama 3.3 70B model with RAG (Retrieval-Augmented Generation) capabilities.
 
 ## Overview
 
-This chatbot helps users get answers to health and medical questions using a modern LLM (Large Language Model). It features a clean web interface built with Flask and uses the Groq API for fast, intelligent responses.
+This chatbot helps users get answers to health and medical questions using a modern LLM combined with a medical knowledge base. It retrieves relevant documents from Pinecone vector database and uses them as context for accurate, informed responses.
 
 ## Features
 
-- Interactive chat interface
-- Fast response times using Groq API (Llama 3.3 70B)
-- Clean, responsive web UI
-- Medical-focused system prompt with appropriate disclaimers
+- **RAG (Retrieval-Augmented Generation)** - Retrieves relevant medical documents from Pinecone
+- **Conversation History** - Remembers context across messages
+- **Fast Responses** - Uses Groq API (Llama 3.3 70B) for quick inference
+- **Clean Web UI** - Responsive Bootstrap interface
+- **New Chat Button** - Clear conversation and start fresh
+- **Graceful Fallback** - Works even if RAG fails
 
 ## Tech Stack
 
@@ -19,8 +21,46 @@ This chatbot helps users get answers to health and medical questions using a mod
 |-----------|------------|
 | **Backend** | Python, Flask |
 | **LLM** | Groq API (Llama 3.3 70B) |
-| **Frontend** | HTML, CSS, Bootstrap |
-| **Vector DB** | Pinecone (for future RAG integration) |
+| **Embeddings** | Sentence Transformers (all-MiniLM-L6-v2) |
+| **Vector DB** | Pinecone |
+| **Frontend** | HTML, CSS, Bootstrap, jQuery |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Query                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Get Embedding                                 │
+│         (Sentence Transformers - all-MiniLM-L6-v2)              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   Query Pinecone                                 │
+│              (Find relevant documents)                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Build Context                                   │
+│         (Format retrieved documents for LLM)                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               Call Groq API with Context                         │
+│           (Llama 3.3 70B generates response)                     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Return Answer                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Project Structure
 
@@ -36,9 +76,9 @@ Medical_chatbot/
 ├── static/
 │   └── style.css         # Styling
 └── src/
+    ├── rag.py            # RAG module (embeddings + Pinecone)
     ├── helper.py         # Utility functions
-    ├── prompt.py         # System prompts
-    └── embed.py          # Embedding utilities
+    └── prompt.py         # System prompts
 ```
 
 ## Setup
@@ -47,6 +87,7 @@ Medical_chatbot/
 
 - Python 3.11+
 - A Groq API key (free at [console.groq.com](https://console.groq.com))
+- A Pinecone API key (free at [pinecone.io](https://pinecone.io))
 
 ### Installation
 
@@ -73,7 +114,7 @@ Medical_chatbot/
    ```
    GROQ_API_KEY=your_groq_api_key_here
    PINECONE_API_KEY=your_pinecone_api_key_here
-   OPENAI_API_KEY=your_openai_api_key_here
+   SECRET_KEY=your_random_secret_key_here
    ```
 
 5. **Run the application**
@@ -84,13 +125,16 @@ Medical_chatbot/
 6. **Open in browser**
    Navigate to `http://localhost:5000`
 
+### Note on First Query
+
+The first query will take **30-60 seconds** as the embedding model loads into memory. Subsequent queries are fast.
+
 ## API Keys
 
 | Service | Purpose | Get it from |
 |---------|---------|-------------|
 | Groq | LLM inference | [console.groq.com](https://console.groq.com) |
 | Pinecone | Vector database | [pinecone.io](https://pinecone.io) |
-| OpenAI | Embeddings | [platform.openai.com](https://platform.openai.com) |
 
 ## Deployment
 
@@ -108,7 +152,7 @@ This app is ready for deployment on platforms like:
 3. Create new Web Service → Connect GitHub repo
 4. Set build command: `pip install -r requirements.txt`
 5. Set start command: `gunicorn app:app`
-6. Add environment variable: `GROQ_API_KEY`
+6. Add environment variables: `GROQ_API_KEY`, `PINECONE_API_KEY`, `SECRET_KEY`
 7. Deploy!
 
 ## Development History
@@ -118,8 +162,9 @@ This app is ready for deployment on platforms like:
 1. **Initial Setup** - Flask app with basic chat interface
 2. **Ollama Integration** - Initially used local Ollama with qwen2.5:3b model
 3. **Groq Migration** - Switched from Ollama to Groq API for faster responses
-4. **Embeddings** - Attempted HuggingFace embeddings (slow on Windows) then OpenAI embeddings
-5. **Production Ready** - Added Procfile, runtime.txt, cleaned up dependencies
+4. **Conversation History** - Added session-based conversation memory
+5. **RAG Implementation** - Added Pinecone vector search for context retrieval
+6. **Production Ready** - Added Procfile, runtime.txt, cleaned up dependencies
 
 ### Why Groq Instead of Ollama?
 
@@ -130,11 +175,12 @@ This app is ready for deployment on platforms like:
 
 ## Future Improvements
 
-- [ ] RAG (Retrieval-Augmented Generation) with Pinecone
-- [ ] Conversation history
+- [x] ~~RAG (Retrieval-Augmented Generation) with Pinecone~~ ✅ Done
+- [x] ~~Conversation history~~ ✅ Done
 - [ ] Multiple language support
 - [ ] Voice input/output
 - [ ] Mobile app version
+- [ ] Stream responses for better UX
 
 ## Disclaimer
 
