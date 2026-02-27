@@ -2,3 +2,4 @@ flask==3.1.1
 gunicorn==21.2.0
 python-dotenv==1.1.0
 requests==2.31.0
+sentence-transformers==4.1.0
